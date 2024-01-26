@@ -8,5 +8,5 @@
   };
   boot.loader.grub.device = "nodev";
   boot.loader.grub.efiSupport = true;
-  environment.defaultPackages = with pkgs; [ joypixels config.nur.repos.milahu.cmix ];
+  environment.defaultPackages = with pkgs; [ nixpkgs-23_11.google-chrome joypixels cmix ];
 }

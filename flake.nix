@@ -1,18 +1,26 @@
 {
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    nixpkgs-master.url = "github:nixos/nixpkgs/master";
-    nixos.url = "github:nixos/nixpkgs/nixos-unstable";
-    impermanence.url = "github:nix-community/impermanence";
-    chaotic.url = "github:chaotic-cx/nyx/nyxpkgs-unstable";
-    hardware.url = "github:nixos/nixos-hardware";
-    nur.url = "github:nix-community/NUR";
-    flake-utils.url = "github:numtide/flake-utils";
-    flake-utils-plus.url = "github:gytis-ivaskevicius/flake-utils-plus";
-    devshell.url = "github:numtide/devshell";
-    nix-direnv.url = "github:nix-community/nix-direnv";
-    flake-parts.url = "github:hercules-ci/flake-parts";
-    git-fat.url = "github:hurricanehrndz/git-fat";
+    nixpkgs = { url = "github:nixos/nixpkgs/nixos-unstable"; };
+    nixpkgs-master = { url = "github:nixos/nixpkgs/master"; };
+    nixpkgs-unstable = { url = "github:nixos/nixpkgs/nixos-unstable"; };
+    nixpkgs-23_11 = { url = "github:nixos/nixpkgs/release-23.11"; };
+    nixpkgs-lib = { url = "github:nixos/nixpkgs/nixos-unstable?dir=lib"; };
+    nixpkgs-master-lib = { url = "github:nixos/nixpkgs/master?dir=lib"; };
+    nixpkgs-unstable-lib = {
+      url = "github:nixos/nixpkgs/nixos-unstable?dir=lib";
+    };
+    nixpkgs-23_11-lib = { url = "github:NixOS/nixpkgs/release-23.11?dir=lib"; };
+    nixos = { url = "github:nixos/nixpkgs/nixos-unstable"; };
+    impermanence = { url = "github:nix-community/impermanence"; };
+    chaotic = { url = "github:chaotic-cx/nyx/nyxpkgs-unstable"; };
+    hardware = { url = "github:nixos/nixos-hardware"; };
+    nur = { url = "github:nix-community/NUR"; };
+    flake-utils = { url = "github:numtide/flake-utils"; };
+    flake-utils-plus = { url = "github:gytis-ivaskevicius/flake-utils-plus"; };
+    devshell = { url = "github:numtide/devshell"; };
+    nix-direnv = { url = "github:nix-community/nix-direnv"; };
+    flake-parts = { url = "github:hercules-ci/flake-parts"; };
+    git-fat = { url = "github:hurricanehrndz/git-fat"; };
     home-manager = {
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -92,13 +100,32 @@
         systems nixpkgs.lib.genAttrs systems
         (system: function nixpkgs.legacyPackages.${system});
       mkNixosConfiguration =
-        { system ? "x86_64-linux", hostname, username, args ? { }, modules, }:
+        { system ? "x86_64-linux", hostname, username, args ? { }, modules }:
         let specialArgs = argDefaults // { inherit hostname username; } // args;
         in lib.nixosSystem {
           inherit system specialArgs;
           modules = [
             (configurationDefaults specialArgs)
             home-manager.nixosModules.home-manager
+            ({ ... }: {
+              nixpkgs.overlays = [
+                # use old nixpkgs
+                (final: _: {
+                  nixpkgs-23_11 = import inputs.nixpkgs-23_11 {
+                    inherit system;
+                    config = defaultNixpkgs.config;
+                  };
+                })
+                # selectively import from NUR
+                (final: prev:
+                  let
+                    _nur = import nur {
+                      pkgs = import nixpkgs { inherit system; };
+                      nurpkgs = import nixpkgs { inherit system; };
+                    };
+                  in { cmix = _nur.repos.milahu.cmix; })
+              ];
+            })
           ] ++ modules;
         };
       isNotInArray = str: arr:
@@ -140,9 +167,13 @@
       };
       nixpkgsConfig = { } // allowEverything // acceptAllLicenses
         // nixpkgsFeatures;
-      nixpkgsWithConfig = with inputs; rec { config = nixpkgsConfig; };
+      nixpkgsWithConfig = with inputs; rec {
+        config = nixpkgsConfig;
+        overlays = [ ];
+      };
+      defaultNixpkgs = nixpkgsWithConfig;
       configurationDefaults = args: {
-        nixpkgs = nixpkgsWithConfig;
+        nixpkgs = defaultNixpkgs;
         home-manager.useGlobalPkgs = true;
         home-manager.useUserPackages = true;
         home-manager.backupFileExtension = "hm-backup";
@@ -205,3 +236,4 @@
 #  "L+ /bin/bash - - - - ${pkgs.bash}/bin/bash"
 #  "L+ /lib64/ld-linux-x86-64.so.2 - - - - ${pkgs.stdenv.glibc}/lib64/ld-linux-x86-64.so.2"
 #];
+
